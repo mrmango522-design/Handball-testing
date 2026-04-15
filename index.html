@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>手球戰術版 - 分段時間線版</title>
+    <style>
+        :root {
+            --court-yellow: #f1c40f; 
+            --court-area: #e67e22;
+            --line-color: #2c3e50; 
+            --team-red: #e74c3c;
+            --team-blue: #3498db;
+            --accent: #2ecc71;
+        }
+
+        body {
+            margin: 0;
+            padding: 10px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e2f;
+            color: white;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+            overflow-x: hidden;
+            user-select: none; /* 防止手機拖曳時反白文字 */
+            -webkit-user-select: none;
+        }
+
+        h1 { margin: 5px 0 10px 0; font-size: 20px; text-align: center; }
+
+        .controls-panel {
+            width: 100%;
+            max-width: 1000px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .controls-group {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px;
+            border-radius: 12px;
+            display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        button {
+            background-color: #3d3d5c;
+            color: white;
+            border: none;
+            padding: 10px 16px; /* 加大按鈕，方便手指點擊 */
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            display: flex; align-items: center; gap: 5px;
+            touch-action: manipulation; /* 防止按鈕連點造成網頁放大 */
+        }
+
+        button:hover { background-color: #5c5c8a; }
+        button:active { transform: scale(0.95); }
+        button.active-mode { background-color: var(--accent); color: #000; font-weight: bold; }
+        button.primary { background-color: var(--accent); color: #000; font-weight: bold; }
+        button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* 時間線樣式 */
+        .timeline-container {
+            width: 100%;
+            max-width: 1000px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 12px;
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-sizing: border-box;
+        }
+
+        .timeline-scroll {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+        }
+
+        .timeline-step {
+            min-width: 80px;
+            height: 40px;
+            background: #444;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+
+        .timeline-step.active {
+            border-color: var(--accent);
+            background: #555;
+        }
+
+        .timeline-step.has-data {
+            background: #34495e;
+        }
+
+        .board-container {
+            position: relative;
+            width: 100%;
+            max-width: 1000px;
+            aspect-ratio: 2 / 1;
+            background-color: var(--court-yellow);
+            border: 4px solid var(--line-color);
+            border-radius: 4px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            touch-action: none; 
+            overflow: hidden;
+        }
+
+        .court-bg {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 1;
+        }
+
+        #drawCanvas {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 5; pointer-events: none;
+        }
+
+        .draggable {
+            position: absolute;
+            width: clamp(26px, 3.5%, 40px); /* 設定最小值，保證手機上夠大容易觸控 */
+            aspect-ratio: 1 / 1;
+            border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            font-weight: bold;
+            font-size: clamp(12px, 1.5vw, 16px);
+            cursor: grab;
+            z-index: 10;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+            user-select: none;
+            -webkit-user-select: none;
+            border: 2px solid white;
+            transition: transform 0.1s;
+            touch-action: none; /* 徹底攔截預設的滑動行為，讓拖曳無死角 */
+        }
+
+        .draggable:active { transform: translate(-50%, -50%) scale(1.1); }
+
+        .player.red { background-color: var(--team-red); color: white; }
+        .player.blue { background-color: var(--team-blue); color: white; }
+
+        .ball {
+            width: clamp(18px, 2.2%, 30px); /* 手機上的球體也要放大 */
+            background-color: #ffffff;
+            border: 2px dashed #333;
+            z-index: 15;
+            border-radius: 50%;
+        }
+
+        .goal {
+            position: absolute; width: 1.5%; height: 15%;
+            background: repeating-linear-gradient(45deg, #e74c3c, #e74c3c 5px, #fff 5px, #fff 10px);
+            border: 2px solid #333; top: 42.5%; z-index: 2;
+        }
+        .goal.left { left: -1.5%; }
+        .goal.right { right: -1.5%; }
+
+        .instruction { margin-top: 10px; font-size: 13px; color: #aaa; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <h1>🤾 手球戰術版 (分段時間線)</h1>
+
+    <div class="controls-panel">
+        <div class="controls-group">
+            <button id="btnMove" class="active-mode">✋ 移動</button>
+            <button id="btnDraw">🖍️ 畫筆</button>
+            <button id="btnClearDraw">🗑️ 清除線條</button>
+            <button id="btnReset">🔄 全部重置</button>
+        </div>
+
+        <div class="controls-group">
+            <button id="btnAddStep" class="primary">➕ 新增時段</button>
+            <button id="btnPlay">▶️ 播放戰術</button>
+            <button id="btnStop" style="display:none;">⏹️ 停止</button>
+        </div>
+
+        <div class="controls-group">
+            <button id="btnExport">📥 匯出戰術 (下載)</button>
+            <button id="btnImport">📤 匯入戰術 (上傳)</button>
+            <button id="btnFullscreen">📱 全螢幕</button>
+            <input type="file" id="fileImport" accept=".json" style="display: none;">
+        </div>
+    </div>
+
+    <div class="board-container" id="board">
+        <svg class="court-bg" viewBox="0 0 400 200" preserveAspectRatio="none">
+            <path d="M 0 25 A 60 60 0 0 1 60 85 L 60 115 A 60 60 0 0 1 0 175 Z" fill="var(--court-area)" stroke="var(--line-color)" stroke-width="1.5" />
+            <path d="M 400 25 A 60 60 0 0 0 340 85 L 340 115 A 60 60 0 0 0 400 175 Z" fill="var(--court-area)" stroke="var(--line-color)" stroke-width="1.5" />
+            <line x1="200" y1="0" x2="200" y2="200" stroke="var(--line-color)" stroke-width="1.5" />
+            <circle cx="200" cy="100" r="5" fill="var(--line-color)" />
+            <path d="M 0 -5 A 90 90 0 0 1 90 85 L 90 115 A 90 90 0 0 1 0 205" fill="none" stroke="var(--line-color)" stroke-width="1.5" stroke-dasharray="4, 4" />
+            <path d="M 400 -5 A 90 90 0 0 0 310 85 L 310 115 A 90 90 0 0 0 400 205" fill="none" stroke="var(--line-color)" stroke-width="1.5" stroke-dasharray="4, 4" />
+        </svg>
+
+        <div class="goal left"></div>
+        <div class="goal right"></div>
+        <canvas id="drawCanvas"></canvas>
+    </div>
+
+    <div class="timeline-container">
+        <div style="font-size: 12px; color: #888;">戰術時間線 (點擊切換時段編輯)</div>
+        <div class="timeline-scroll" id="timelineScroll">
+            <!-- 時段按鈕會生成在這裡 -->
+        </div>
+    </div>
+
+    <div class="instruction">
+        提示：先在「時段 1」擺好位置，按「新增時段」後移動球員至新位置，最後按「播放」。<br>
+        📱 手機用戶建議點擊「全螢幕」並將設備「橫向」使用，體驗最佳！
+    </div>
+
+    <script>
+        const board = document.getElementById('board');
+        const canvas = document.getElementById('drawCanvas');
+        const ctx = canvas.getContext('2d');
+        const timelineScroll = document.getElementById('timelineScroll');
+        
+        let isDrawMode = false;
+        let isDrawing = false;
+        let ballOwnerId = null; 
+
+        // 多點觸控
+        const activePointers = new Map();
+
+        // 時間線數據
+        // steps 結構: [{ ballOwnerId, elements: { id: {left, top} } }]
+        let steps = [];
+        let currentStepIndex = 0;
+        let isPlaying = false;
+
+        const BALL_OFFSET_X = 1.2; 
+        const BALL_OFFSET_Y = -1.2; 
+
+        const initialLayout = {
+            ball: { left: '50%', top: '50%' },
+            blue: [
+                { id: 'b1', left: '5%', top: '50%', text: '1' },
+                { id: 'b2', left: '20%', top: '15%', text: '2' },
+                { id: 'b3', left: '25%', top: '35%', text: '3' },
+                { id: 'b4', left: '28%', top: '50%', text: '4' },
+                { id: 'b5', left: '25%', top: '65%', text: '5' },
+                { id: 'b6', left: '20%', top: '85%', text: '6' },
+                { id: 'b7', left: '35%', top: '50%', text: '7' }
+            ],
+            red: [
+                { id: 'r1', left: '95%', top: '50%', text: '1' },
+                { id: 'r2', left: '80%', top: '15%', text: '2' },
+                { id: 'r3', left: '75%', top: '35%', text: '3' },
+                { id: 'r4', left: '72%', top: '50%', text: '4' },
+                { id: 'r5', left: '75%', top: '65%', text: '5' },
+                { id: 'r6', left: '80%', top: '85%', text: '6' },
+                { id: 'r7', left: '65%', top: '50%', text: '7' }
+            ]
+        };
+
+        function initBoard() {
+            document.querySelectorAll('.draggable').forEach(el => el.remove());
+            ballOwnerId = null;
+            activePointers.clear();
+            
+            initialLayout.blue.forEach(p => createDraggable('player blue', p));
+            initialLayout.red.forEach(p => createDraggable('player red', p));
+            createDraggable('ball', { id: 'ball', left: initialLayout.ball.left, top: initialLayout.ball.top, text: '' });
+            
+            // 初始化時間線
+            steps = [];
+            addStep(); 
+            renderTimeline();
+        }
+
+        function createDraggable(className, data) {
+            const el = document.createElement('div');
+            el.className = `draggable ${className}`;
+            el.id = data.id;
+            el.textContent = data.text;
+            el.style.left = data.left;
+            el.style.top = data.top;
+            board.appendChild(el);
+        }
+
+        function updateBallToOwnerPosition() {
+            if (!ballOwnerId) return;
+            const owner = document.getElementById(ballOwnerId);
+            const ball = document.getElementById('ball');
+            if (owner && ball) {
+                const ownerLeft = parseFloat(owner.style.left);
+                const ownerTop = parseFloat(owner.style.top);
+                ball.style.left = (ownerLeft + BALL_OFFSET_X) + '%';
+                ball.style.top = (ownerTop + BALL_OFFSET_Y) + '%';
+            }
+        }
+
+        function checkBallCapture(movingElement) {
+            const ballEl = document.getElementById('ball');
+            if (!ballEl) return; 
+
+            const ballRect = ballEl.getBoundingClientRect();
+            const ballCenterX = ballRect.left + ballRect.width / 2;
+            const ballCenterY = ballRect.top + ballRect.height / 2;
+            const ballRadius = ballRect.width / 2;
+
+            const players = document.querySelectorAll('.player');
+            
+            let foundOwner = false;
+            players.forEach(p => {
+                const pRect = p.getBoundingClientRect();
+                const pCenterX = pRect.left + pRect.width / 2;
+                const pCenterY = pRect.top + pRect.height / 2;
+                const pRadius = pRect.width / 2;
+
+                const distance = Math.hypot(ballCenterX - pCenterX, ballCenterY - pCenterY);
+                
+                if (distance < (ballRadius + pRadius + 5)) {
+                    ballOwnerId = p.id;
+                    foundOwner = true;
+                }
+            });
+
+            if (foundOwner && movingElement && movingElement.id === 'ball') {
+                updateBallToOwnerPosition();
+            }
+        }
+
+        // 保存當前畫面到當前時段
+        function saveCurrentStateToStep() {
+            const elements = {};
+            document.querySelectorAll('.draggable').forEach(el => {
+                elements[el.id] = { left: el.style.left, top: el.style.top };
+            });
+            steps[currentStepIndex] = { ballOwnerId, elements };
+        }
+
+        // 加載特定時段到畫面
+        function loadStepToBoard(index) {
+            const step = steps[index];
+            if (!step) return;
+            
+            currentStepIndex = index;
+            ballOwnerId = step.ballOwnerId;
+            
+            Object.keys(step.elements).forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.style.left = step.elements[id].left;
+                    el.style.top = step.elements[id].top;
+                }
+            });
+            renderTimeline();
+        }
+
+        function addStep() {
+            if (steps.length > 0) {
+                saveCurrentStateToStep();
+            }
+            
+            // 預設繼承上一個時段的位置
+            const lastStep = steps[steps.length - 1];
+            const newElements = lastStep ? JSON.parse(JSON.stringify(lastStep.elements)) : {};
+            
+            if (!lastStep) {
+                // 初次初始化
+                document.querySelectorAll('.draggable').forEach(el => {
+                    newElements[el.id] = { left: el.style.left, top: el.style.top };
+                });
+            }
+
+            steps.push({
+                ballOwnerId: lastStep ? lastStep.ballOwnerId : null,
+                elements: newElements
+            });
+            
+            currentStepIndex = steps.length - 1;
+            renderTimeline();
+            
+            // 自動滾動到底部
+            setTimeout(() => {
+                timelineScroll.scrollLeft = timelineScroll.scrollWidth;
+            }, 100);
+        }
+
+        function renderTimeline() {
+            timelineScroll.innerHTML = '';
+            steps.forEach((_, idx) => {
+                const stepDiv = document.createElement('div');
+                stepDiv.className = `timeline-step ${idx === currentStepIndex ? 'active' : ''}`;
+                stepDiv.textContent = `時段 ${idx + 1}`;
+                stepDiv.onclick = () => {
+                    if (isPlaying) return;
+                    saveCurrentStateToStep();
+                    loadStepToBoard(idx);
+                };
+                timelineScroll.appendChild(stepDiv);
+            });
+        }
+
+        // --- 拖拽邏輯 ---
+        function onPointerDown(e) {
+            if (isDrawMode || isPlaying) return;
+            const target = e.target.closest('.draggable');
+            if (target) {
+                for (let ptr of activePointers.values()) {
+                    if (ptr.target === target) return; 
+                }
+                const rect = target.getBoundingClientRect();
+                const offsetX = e.clientX - (rect.left + rect.width / 2);
+                const offsetY = e.clientY - (rect.top + rect.height / 2);
+                activePointers.set(e.pointerId, { target, offsetX, offsetY });
+                target.setPointerCapture(e.pointerId);
+                if (target.id === 'ball') ballOwnerId = null;
+            }
+        }
+
+        function onPointerMove(e) {
+            if (isDrawMode || isPlaying) return;
+            const pointerData = activePointers.get(e.pointerId);
+            if (pointerData) {
+                const { target, offsetX, offsetY } = pointerData;
+                const boardRect = board.getBoundingClientRect();
+                let x = e.clientX - boardRect.left - offsetX;
+                let y = e.clientY - boardRect.top - offsetY;
+                const leftPct = (Math.max(0, Math.min(x, boardRect.width)) / boardRect.width) * 100;
+                const topPct = (Math.max(0, Math.min(y, boardRect.height)) / boardRect.height) * 100;
+                target.style.left = leftPct + '%';
+                target.style.top = topPct + '%';
+                if (target.id === ballOwnerId) updateBallToOwnerPosition();
+                if (target.id === 'ball') checkBallCapture(target);
+                
+                // 動時即存，確保點擊時段時資料是最新的
+                saveCurrentStateToStep();
+            }
+        }
+
+        function onPointerUp(e) {
+            const pointerData = activePointers.get(e.pointerId);
+            if (pointerData) {
+                const { target } = pointerData;
+                if (target.id === 'ball') checkBallCapture(target);
+                activePointers.delete(e.pointerId);
+                target.releasePointerCapture(e.pointerId);
+                saveCurrentStateToStep();
+            }
+        }
+
+        board.addEventListener('pointerdown', onPointerDown);
+        board.addEventListener('pointermove', onPointerMove);
+        board.addEventListener('pointerup', onPointerUp);
+        board.addEventListener('pointercancel', onPointerUp);
+
+        // --- 播放邏輯 ---
+        async function playTactics() {
+            if (steps.length < 2) return;
+            saveCurrentStateToStep();
+            isPlaying = true;
+            document.getElementById('btnPlay').style.display = 'none';
+            document.getElementById('btnStop').style.display = 'flex';
+            
+            const durationPerStep = 1000; // 每個時段移動耗時 1 秒
+            const fps = 60;
+            const totalFrames = (durationPerStep / 1000) * fps;
+
+            for (let i = 0; i < steps.length - 1; i++) {
+                if (!isPlaying) break;
+                
+                const startStep = steps[i];
+                const endStep = steps[i + 1];
+                loadStepToBoard(i);
+
+                for (let frame = 1; frame <= totalFrames; frame++) {
+                    if (!isPlaying) break;
+                    
+                    const progress = frame / totalFrames; // 0 to 1
+                    
+                    // 插值計算所有物件位置
+                    Object.keys(endStep.elements).forEach(id => {
+                        const startPos = startStep.elements[id];
+                        const endPos = endStep.elements[id];
+                        const el = document.getElementById(id);
+                        
+                        const curLeft = parseFloat(startPos.left) + (parseFloat(endPos.left) - parseFloat(startPos.left)) * progress;
+                        const curTop = parseFloat(startPos.top) + (parseFloat(endPos.top) - parseFloat(startPos.top)) * progress;
+                        
+                        el.style.left = curLeft + '%';
+                        el.style.top = curTop + '%';
+                    });
+
+                    // 更新目前的球主，但不再強制瞬間吸附，讓球能夠平滑飛過去
+                    ballOwnerId = progress > 0.5 ? endStep.ballOwnerId : startStep.ballOwnerId;
+                    
+                    await new Promise(r => requestAnimationFrame(r));
+                }
+                if (!isPlaying) break;
+                loadStepToBoard(i + 1);
+                await new Promise(r => setTimeout(r, 200)); // 停頓一下
+            }
+            
+            stopPlayback();
+        }
+
+        function stopPlayback() {
+            isPlaying = false;
+            document.getElementById('btnPlay').style.display = 'flex';
+            document.getElementById('btnStop').style.display = 'none';
+        }
+
+        // --- 畫筆與其他 ---
+        function resizeCanvas() {
+            // 儲存原本的畫線，避免手機轉向/切換全螢幕時線條消失
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = canvas.width || 1;
+            tempCanvas.height = canvas.height || 1;
+            if (canvas.width > 0 && canvas.height > 0) {
+                tempCtx.drawImage(canvas, 0, 0);
+            }
+
+            const rect = board.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            ctx.strokeStyle = '#2c3e50'; 
+            ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+            // 將舊線條依比例畫回新尺寸的畫布
+            if (tempCanvas.width > 1 && tempCanvas.height > 1) {
+                ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width, tempCanvas.height, 0, 0, canvas.width, canvas.height);
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        function startDrawing(e) {
+            if (!isDrawMode) return;
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            ctx.beginPath();
+            ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+        }
+
+        function draw(e) {
+            if (!isDrawMode || !isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+            ctx.stroke();
+        }
+
+        // 改用 pointer 事件來讓觸控設備也能順暢畫線
+        canvas.addEventListener('pointerdown', (e) => { 
+            if(isDrawMode) { 
+                canvas.setPointerCapture(e.pointerId);
+                startDrawing(e); 
+            }
+        });
+        canvas.addEventListener('pointermove', (e) => { 
+            if(isDrawMode) draw(e); 
+        });
+        canvas.addEventListener('pointerup', (e) => {
+            if(isDrawMode) {
+                canvas.releasePointerCapture(e.pointerId);
+                isDrawing = false;
+            }
+        });
+        canvas.addEventListener('pointercancel', () => isDrawing = false);
+
+        document.getElementById('btnMove').onclick = () => { 
+            isDrawMode = false; 
+            document.getElementById('btnMove').className = 'active-mode'; 
+            document.getElementById('btnDraw').className = ''; 
+            canvas.style.pointerEvents = 'none'; 
+        };
+        document.getElementById('btnDraw').onclick = () => { 
+            isDrawMode = true; 
+            document.getElementById('btnDraw').className = 'active-mode'; 
+            document.getElementById('btnMove').className = ''; 
+            canvas.style.pointerEvents = 'auto'; 
+        };
+        document.getElementById('btnClearDraw').onclick = () => ctx.clearRect(0, 0, canvas.width, canvas.height);
+        document.getElementById('btnReset').onclick = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            initBoard();
+        };
+        document.getElementById('btnAddStep').onclick = () => { if(!isPlaying) addStep(); };
+        document.getElementById('btnPlay').onclick = playTactics;
+        document.getElementById('btnStop').onclick = stopPlayback;
+
+        // 全螢幕切換功能
+        document.getElementById('btnFullscreen').onclick = () => {
+            if (!document.fullscreenElement) {
+                const elem = document.documentElement;
+                if (elem.requestFullscreen) elem.requestFullscreen();
+                else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen(); // Safari支援
+                else if (elem.msRequestFullscreen) elem.msRequestFullscreen(); // IE11支援
+                
+                // 嘗試鎖定橫向螢幕 (需行動裝置瀏覽器支援)
+                if (screen.orientation && screen.orientation.lock) {
+                    screen.orientation.lock('landscape').catch(e => console.log(e));
+                }
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+                else if (document.msExitFullscreen) document.msExitFullscreen();
+            }
+        };
+
+        // --- 匯出與匯入功能 ---
+        document.getElementById('btnExport').onclick = () => {
+            if (isPlaying) return;
+            saveCurrentStateToStep(); // 確保當前修改已儲存
+            const dataStr = JSON.stringify(steps);
+            const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+            const exportFileDefaultName = 'handball_tactics.json';
+
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            document.body.appendChild(linkElement);
+            linkElement.click();
+            document.body.removeChild(linkElement);
+        };
+
+        document.getElementById('btnImport').onclick = () => {
+            if (isPlaying) return;
+            document.getElementById('fileImport').click();
+        };
+
+        document.getElementById('fileImport').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const importedSteps = JSON.parse(event.target.result);
+                    if (Array.isArray(importedSteps) && importedSteps.length > 0) {
+                        steps = importedSteps;
+                        currentStepIndex = 0;
+                        loadStepToBoard(0); // 載入第一個時段
+                        renderTimeline();
+                        ctx.clearRect(0, 0, canvas.width, canvas.height); // 清除舊的畫線
+                    } else {
+                        alert("❌ 無效的戰術檔案格式！");
+                    }
+                } catch (error) {
+                    alert("❌ 讀取檔案失敗！");
+                }
+            };
+            reader.readAsText(file);
+            e.target.value = ''; // 清除選擇，允許未來重複上傳同一檔案
+        });
+
+        initBoard();
+        setTimeout(resizeCanvas, 100);
+    </script>
+</body>
+</html>
