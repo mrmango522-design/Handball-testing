@@ -7,7 +7,7 @@
     <style>
         :root {
             --court-yellow: #f1c40f; 
-            --court-area: #e67e22;
+            --court-area: #1a4f8b; 
             --line-color: #2c3e50; 
             --team-red: #e74c3c;
             --team-blue: #3498db;
@@ -24,7 +24,7 @@
             min-height: 100vh;
             box-sizing: border-box;
             overflow-x: hidden;
-            user-select: none; /* 防止手機拖曳時反白文字 */
+            user-select: none; 
             -webkit-user-select: none;
         }
 
@@ -32,7 +32,7 @@
 
         .controls-panel {
             width: 100%;
-            max-width: 1000px;
+            max-width: 1400px;
             display: flex;
             flex-direction: column;
             gap: 10px;
@@ -51,25 +51,77 @@
             background-color: #3d3d5c;
             color: white;
             border: none;
-            padding: 10px 16px; /* 加大按鈕，方便手指點擊 */
+            padding: 10px 16px; 
             border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
             transition: all 0.2s;
             display: flex; align-items: center; gap: 5px;
-            touch-action: manipulation; /* 防止按鈕連點造成網頁放大 */
+            touch-action: manipulation; 
         }
 
-        button:hover { background-color: #5c5c8a; }
-        button:active { transform: scale(0.95); }
+        button:hover:not(:disabled) { background-color: #5c5c8a; }
+        button:active:not(:disabled) { transform: scale(0.95); }
         button.active-mode { background-color: var(--accent); color: #000; font-weight: bold; }
         button.primary { background-color: var(--accent); color: #000; font-weight: bold; }
         button:disabled { opacity: 0.3; cursor: not-allowed; }
 
+        select.dropdown-setting {
+            background-color: #3d3d5c;
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        /* 左右分欄排版佈局 */
+        .main-workspace {
+            display: flex;
+            width: 100%;
+            max-width: 1400px;
+            gap: 15px;
+            align-items: flex-start;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .board-column {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        .coord-column {
+            display: none; /* 預設隱藏 */
+            width: 380px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-sizing: border-box;
+            flex-shrink: 0;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @media (max-width: 900px) {
+            .main-workspace { flex-direction: column; align-items: center; }
+            .coord-column { width: 100%; max-width: 1000px; }
+        }
+
         /* 時間線樣式 */
         .timeline-container {
             width: 100%;
-            max-width: 1000px;
             background: rgba(0, 0, 0, 0.3);
             padding: 15px;
             border-radius: 12px;
@@ -108,26 +160,40 @@
             background: #555;
         }
 
-        .timeline-step.has-data {
-            background: #34495e;
-        }
-
-        .board-container {
+        /* 外層緩衝區 (負責提供邊界外的視覺空間) */
+        .board-wrapper {
             position: relative;
             width: 100%;
             max-width: 1000px;
-            aspect-ratio: 2 / 1;
             background-color: var(--court-yellow);
             border: 4px solid var(--line-color);
             border-radius: 4px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            touch-action: none; 
+            padding: clamp(15px, 4%, 40px); /* 提供界外空間 */
+            box-sizing: border-box;
+            transition: width 0.3s ease, max-width 0.3s ease;
+            --player-size: 2.8%;  /* 縮小為原來的 0.8 倍 (原 3.5%) */
+            --ball-size: 1.76%;   /* 縮小為原來的 0.8 倍 (原 2.2%) */
             overflow: hidden;
+        }
+
+        .board-wrapper.is-narrow {
+            --player-size: 5.6%;  /* 縮小為原來的 0.8 倍 (原 7%) */
+            --ball-size: 3.52%;   /* 縮小為原來的 0.8 倍 (原 4.4%) */
+        }
+
+        /* 內層球場區 */
+        .board-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 2 / 1; 
+            touch-action: none; 
         }
 
         .court-bg {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 1;
+            overflow: visible; 
         }
 
         #drawCanvas {
@@ -137,12 +203,12 @@
 
         .draggable {
             position: absolute;
-            width: clamp(26px, 3.5%, 40px); /* 設定最小值，保證手機上夠大容易觸控 */
+            width: clamp(21px, var(--player-size), 32px); /* 調整極值界限至 0.8 倍 */
             aspect-ratio: 1 / 1;
             border-radius: 50%;
             display: flex; justify-content: center; align-items: center;
             font-weight: bold;
-            font-size: clamp(12px, 1.5vw, 16px);
+            font-size: clamp(11px, 1.3vw, 14px); /* 字體微調 */
             cursor: grab;
             z-index: 10;
             transform: translate(-50%, -50%);
@@ -151,7 +217,7 @@
             -webkit-user-select: none;
             border: 2px solid white;
             transition: transform 0.1s;
-            touch-action: none; /* 徹底攔截預設的滑動行為，讓拖曳無死角 */
+            touch-action: none; 
         }
 
         .draggable:active { transform: translate(-50%, -50%) scale(1.1); }
@@ -160,7 +226,7 @@
         .player.blue { background-color: var(--team-blue); color: white; }
 
         .ball {
-            width: clamp(18px, 2.2%, 30px); /* 手機上的球體也要放大 */
+            width: clamp(14px, var(--ball-size), 24px); /* 調整極值界限至 0.8 倍 */
             background-color: #ffffff;
             border: 2px dashed #333;
             z-index: 15;
@@ -168,14 +234,49 @@
         }
 
         .goal {
-            position: absolute; width: 1.5%; height: 15%;
+            position: absolute;
             background: repeating-linear-gradient(45deg, #e74c3c, #e74c3c 5px, #fff 5px, #fff 10px);
-            border: 2px solid #333; top: 42.5%; z-index: 2;
+            border: 2px solid #333; z-index: 2;
         }
-        .goal.left { left: -1.5%; }
-        .goal.right { right: -1.5%; }
+
+        /* 座標網格疊加層 */
+        .grid-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 4; 
+        }
+
+        /* 座標面板表格樣式 */
+        .coord-table {
+            width: 100%; border-collapse: collapse; font-size: 13px; text-align: center;
+            margin-top: 10px;
+        }
+        .coord-table th, .coord-table td {
+            padding: 6px 4px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .coord-table th { font-weight: normal; color: #ccc; }
+        .coord-input {
+            width: 45px; background: #1e1e2f; color: white; border: 1px solid #555;
+            border-radius: 4px; text-align: center; padding: 4px; font-family: monospace;
+        }
+        .coord-input:focus { border-color: var(--accent); outline: none; }
+        /* 隱藏原生數字箭頭 */
+        .coord-input::-webkit-outer-spin-button, .coord-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .coord-input[type=number] { -moz-appearance: textfield; }
 
         .instruction { margin-top: 10px; font-size: 13px; color: #aaa; text-align: center; }
+
+        /* 自定義彈窗 (Modal) */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.75); z-index: 9999;
+            justify-content: center; align-items: center; backdrop-filter: blur(3px);
+        }
+        .modal-content {
+            background: #2c3e50; padding: 25px; border-radius: 12px;
+            text-align: center; max-width: 80%; width: 320px;
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
     </style>
 </head>
 <body>
@@ -183,6 +284,35 @@
     <h1>🤾 手球戰術版 (分段時間線)</h1>
 
     <div class="controls-panel">
+        <div class="controls-group">
+            <select id="selGameMode" class="dropdown-setting" style="border-color: #e67e22;">
+                <option value="versus" selected>⚔️ 對抗模式</option>
+                <option value="practice">🎯 練習模式 (僅藍隊)</option>
+            </select>
+            <select id="selInputMode" class="dropdown-setting" style="border-color: var(--accent);">
+                <option value="drag">✋ 拖拉式移動</option>
+                <option value="coordinate">🔢 座標式移動</option>
+            </select>
+            <!-- 預設垂直與半場 -->
+            <select id="selOrientation" class="dropdown-setting">
+                <option value="horizontal">↔️ 水平場地</option>
+                <option value="vertical" selected>↕️ 垂直場地</option>
+            </select>
+            <select id="selType" class="dropdown-setting">
+                <option value="full">⬛ 全場</option>
+                <option value="half" selected>🔲 半場 (紅防藍攻)</option>
+            </select>
+        </div>
+
+        <!-- 陣型切換區域 (僅半場時顯示) -->
+        <div class="controls-group" id="formationControls" style="display: flex;">
+            <span style="font-size: 13px; color: #aaa; margin-right: 5px; display: flex; align-items: center;">🛡️ 防守陣型:</span>
+            <button class="btn-formation active-mode" data-formation="6-0">6-0</button>
+            <button class="btn-formation" data-formation="5-1">5-1</button>
+            <button class="btn-formation" data-formation="4-2">4-2</button>
+            <button class="btn-formation" data-formation="3-3">3-3</button>
+        </div>
+
         <div class="controls-group">
             <button id="btnMove" class="active-mode">✋ 移動</button>
             <button id="btnDraw">🖍️ 畫筆</button>
@@ -194,41 +324,60 @@
             <button id="btnAddStep" class="primary">➕ 新增時段</button>
             <button id="btnPlay">▶️ 播放戰術</button>
             <button id="btnStop" style="display:none;">⏹️ 停止</button>
-        </div>
-
-        <div class="controls-group">
-            <button id="btnExport">📥 匯出戰術 (下載)</button>
-            <button id="btnImport">📤 匯入戰術 (上傳)</button>
+            <button id="btnExport">📥 匯出</button>
+            <button id="btnImport">📤 匯入</button>
             <button id="btnFullscreen">📱 全螢幕</button>
             <input type="file" id="fileImport" accept=".json" style="display: none;">
         </div>
     </div>
 
-    <div class="board-container" id="board">
-        <svg class="court-bg" viewBox="0 0 400 200" preserveAspectRatio="none">
-            <path d="M 0 25 A 60 60 0 0 1 60 85 L 60 115 A 60 60 0 0 1 0 175 Z" fill="var(--court-area)" stroke="var(--line-color)" stroke-width="1.5" />
-            <path d="M 400 25 A 60 60 0 0 0 340 85 L 340 115 A 60 60 0 0 0 400 175 Z" fill="var(--court-area)" stroke="var(--line-color)" stroke-width="1.5" />
-            <line x1="200" y1="0" x2="200" y2="200" stroke="var(--line-color)" stroke-width="1.5" />
-            <circle cx="200" cy="100" r="5" fill="var(--line-color)" />
-            <path d="M 0 -5 A 90 90 0 0 1 90 85 L 90 115 A 90 90 0 0 1 0 205" fill="none" stroke="var(--line-color)" stroke-width="1.5" stroke-dasharray="4, 4" />
-            <path d="M 400 -5 A 90 90 0 0 0 310 85 L 310 115 A 90 90 0 0 0 400 205" fill="none" stroke="var(--line-color)" stroke-width="1.5" stroke-dasharray="4, 4" />
-        </svg>
+    <div class="main-workspace">
+        <div class="board-column">
+            <!-- 將原本的 board-container 包裝在 board-wrapper 內 -->
+            <div class="board-wrapper" id="boardWrapper">
+                <div class="board-container" id="board">
+                    <!-- SVG與Goal將由JS動態生成 -->
+                    <svg id="gridOverlay" class="grid-overlay" preserveAspectRatio="none" style="display: none;"></svg>
+                    <canvas id="drawCanvas"></canvas>
+                </div>
+            </div>
 
-        <div class="goal left"></div>
-        <div class="goal right"></div>
-        <canvas id="drawCanvas"></canvas>
-    </div>
+            <div class="timeline-container">
+                <div style="font-size: 12px; color: #888;">戰術時間線 (點擊切換時段編輯)</div>
+                <div class="timeline-scroll" id="timelineScroll"></div>
+            </div>
+        </div>
 
-    <div class="timeline-container">
-        <div style="font-size: 12px; color: #888;">戰術時間線 (點擊切換時段編輯)</div>
-        <div class="timeline-scroll" id="timelineScroll">
-            <!-- 時段按鈕會生成在這裡 -->
+        <!-- 座標控制面板 -->
+        <div class="coord-column" id="coordColumn">
+            <h3 style="margin: 0 0 10px 0; font-size: 16px; text-align: center;">📍 網格座標矩陣</h3>
+            <p style="margin: 0 0 10px 0; font-size: 12px; text-align: center; color: #aaa;" id="gridInfo">X 軸: 0~100 | Y 軸: 自動比例</p>
+            <table class="coord-table">
+                <thead>
+                    <!-- JS 動態生成 -->
+                </thead>
+                <tbody id="coordTableBody">
+                    <!-- JS 動態生成 -->
+                </tbody>
+            </table>
         </div>
     </div>
 
     <div class="instruction">
         提示：先在「時段 1」擺好位置，按「新增時段」後移動球員至新位置，最後按「播放」。<br>
-        📱 手機用戶建議點擊「全螢幕」並將設備「橫向」使用，體驗最佳！
+        📱 手機用戶建議點擊「全螢幕」並體驗最佳！
+    </div>
+
+    <!-- 自定義警告彈窗 -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-content">
+            <h3 style="margin-top:0;">⚠️ 變更場地</h3>
+            <p style="font-size: 14px; color: #ddd;">切換場地將會清除目前所有的戰術步驟與畫線，確定要繼續嗎？</p>
+            <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
+                <button id="btnConfirmChange" class="primary">確定切換</button>
+                <button id="btnCancelChange" style="background:#555;">取消</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -241,11 +390,15 @@
         let isDrawing = false;
         let ballOwnerId = null; 
 
-        // 多點觸控
-        const activePointers = new Map();
+        let gameMode = 'versus'; // 'versus' | 'practice'
+        let inputMode = 'drag'; 
+        let courtOrientation = 'vertical'; // 預設更改為垂直
+        let courtType = 'half';            // 預設更改為半場
+        let pendingGameMode = null;
+        let pendingOrientation = null;
+        let pendingType = null;
 
-        // 時間線數據
-        // steps 結構: [{ ballOwnerId, elements: { id: {left, top} } }]
+        const activePointers = new Map();
         let steps = [];
         let currentStepIndex = 0;
         let isPlaying = false;
@@ -253,41 +406,345 @@
         const BALL_OFFSET_X = 1.2; 
         const BALL_OFFSET_Y = -1.2; 
 
-        const initialLayout = {
-            ball: { left: '50%', top: '50%' },
-            blue: [
-                { id: 'b1', left: '5%', top: '50%', text: '1' },
-                { id: 'b2', left: '20%', top: '15%', text: '2' },
-                { id: 'b3', left: '25%', top: '35%', text: '3' },
-                { id: 'b4', left: '28%', top: '50%', text: '4' },
-                { id: 'b5', left: '25%', top: '65%', text: '5' },
-                { id: 'b6', left: '20%', top: '85%', text: '6' },
-                { id: 'b7', left: '35%', top: '50%', text: '7' }
-            ],
-            red: [
-                { id: 'r1', left: '95%', top: '50%', text: '1' },
-                { id: 'r2', left: '80%', top: '15%', text: '2' },
-                { id: 'r3', left: '75%', top: '35%', text: '3' },
-                { id: 'r4', left: '72%', top: '50%', text: '4' },
-                { id: 'r5', left: '75%', top: '65%', text: '5' },
-                { id: 'r6', left: '80%', top: '85%', text: '6' },
-                { id: 'r7', left: '65%', top: '50%', text: '7' }
-            ]
+        // 為了讓 getDynamicLayout 自動翻轉出正確的垂直坐標
+        // 所有的 baseLayout 必須是 "水平模式" (球門在左側) 作為基準
+        const layouts = {
+            'full': {
+                ball: { left: '50%', top: '50%' },
+                blue: [
+                    { id: 'b1', left: '3%', top: '50%', text: '1' },  
+                    { id: 'b2', left: '8%', top: '11%', text: '2' },  
+                    { id: 'b3', left: '15%', top: '24%', text: '3' }, 
+                    { id: 'b4', left: '18%', top: '56%', text: '4' }, 
+                    { id: 'b5', left: '16%', top: '72%', text: '5' }, 
+                    { id: 'b6', left: '10%', top: '84%', text: '6' }, 
+                    { id: 'b7', left: '18%', top: '38%', text: '7' }  
+                ],
+                red: [
+                    { id: 'r1', left: '97%', top: '50%', text: '1' }, 
+                    { id: 'r2', left: '91%', top: '10%', text: '2' }, 
+                    { id: 'r3', left: '86%', top: '20%', text: '3' }, 
+                    { id: 'r4', left: '82%', top: '53%', text: '4' }, 
+                    { id: 'r5', left: '83%', top: '36%', text: '5' }, 
+                    { id: 'r6', left: '84%', top: '70%', text: '6' }, 
+                    { id: 'r7', left: '90%', top: '84%', text: '7' }  
+                ]
+            },
+            'half': {
+                // 將垂直圖片的(X,Y)互換成(Y,X)作為基礎水平值
+                ball: { left: '66.67%', top: '50%' },
+                red: [
+                    { id: 'r1', left: '8.33%', top: '50%', text: '1' },
+                    { id: 'r2', left: '12.5%', top: '12.5%', text: '2' },
+                    { id: 'r3', left: '25%', top: '25%', text: '3' },
+                    { id: 'r4', left: '33.33%', top: '41.67%', text: '4' },
+                    { id: 'r5', left: '33.33%', top: '58.33%', text: '5' },
+                    { id: 'r6', left: '25%', top: '75%', text: '6' },
+                    { id: 'r7', left: '12.5%', top: '87.5%', text: '7' }
+                ],
+                blue: [
+                    { id: 'b1', left: '100%', top: '0%', text: '1' }, 
+                    { id: 'b2', left: '25%', top: '0%', text: '2' }, 
+                    { id: 'b3', left: '50%', top: '16.67%', text: '3' }, 
+                    { id: 'b4', left: '66.67%', top: '50%', text: '4' }, 
+                    { id: 'b5', left: '50%', top: '83.33%', text: '5' }, 
+                    { id: 'b6', left: '25%', top: '100%', text: '6' }, 
+                    { id: 'b7', left: '41.67%', top: '50%', text: '7' }  
+                ]
+            }
         };
+
+        // 防守陣型定義 (以使用者直覺的垂直坐標 X=0~12, Y=0~12 為基準)
+        const redFormationsVertical = {
+            '6-0': { r1: {x:6, y:1}, r2: {x:1.5, y:1.5}, r3: {x:3, y:3}, r4: {x:5, y:4}, r5: {x:7, y:4}, r6: {x:9, y:3}, r7: {x:10.5, y:1.5} },
+            '5-1': { r1: {x:6, y:1}, r2: {x:2.3, y:2.5}, r3: {x:4, y:3.5}, r4: {x:6, y:6}, r5: {x:6, y:4}, r6: {x:8, y:3.5}, r7: {x:9.7, y:2.5} },
+            '4-2': { r1: {x:6, y:1}, r2: {x:2.5, y:2.5}, r3: {x:4.5, y:3.5}, r4: {x:4.5, y:5.5}, r5: {x:7.5, y:5.5}, r6: {x:7.5, y:3.5}, r7: {x:9.5, y:2.5} },
+            '3-3': { r1: {x:6, y:1}, r2: {x:3, y:3}, r3: {x:3, y:5}, r4: {x:6, y:3.5}, r5: {x:6, y:6}, r6: {x:9, y:5}, r7: {x:9, y:3} }
+        };
+
+        // --- 座標面板初始化與資料綁定 ---
+        function initCoordPanel() {
+            const thead = document.querySelector('.coord-table thead');
+            const tbody = document.getElementById('coordTableBody');
+            const isPractice = gameMode === 'practice';
+            
+            thead.innerHTML = `
+                <tr>
+                    <th rowspan="2" style="border-right: 1px solid rgba(255,255,255,0.1);">號碼</th>
+                    ${!isPractice ? '<th colspan="2" style="color:var(--team-red); border-right: 1px solid rgba(255,255,255,0.1);">紅隊 (X, Y)</th>' : ''}
+                    <th colspan="2" style="color:var(--team-blue);">藍隊 (X, Y)</th>
+                </tr>
+                <tr>
+                    ${!isPractice ? '<th>X</th><th style="border-right: 1px solid rgba(255,255,255,0.1);">Y</th>' : ''}
+                    <th>X</th><th>Y</th>
+                </tr>
+            `;
+
+            tbody.innerHTML = '';
+            for (let i = 1; i <= 7; i++) {
+                const tr = document.createElement('tr');
+                let html = `<td style="border-right: 1px solid rgba(255,255,255,0.1);">${i}</td>`;
+                if (!isPractice) {
+                    html += `
+                        <td><input type="number" class="coord-input" data-id="r${i}" data-axis="x" step="0.5"></td>
+                        <td style="border-right: 1px solid rgba(255,255,255,0.1);"><input type="number" class="coord-input" data-id="r${i}" data-axis="y" step="0.5"></td>
+                    `;
+                }
+                html += `
+                    <td><input type="number" class="coord-input" data-id="b${i}" data-axis="x" step="0.5"></td>
+                    <td><input type="number" class="coord-input" data-id="b${i}" data-axis="y" step="0.5"></td>
+                `;
+                tr.innerHTML = html;
+                tbody.appendChild(tr);
+            }
+            // 球的行
+            const trBall = document.createElement('tr');
+            let ballHtml = `<td style="border-right: 1px solid rgba(255,255,255,0.1);">⚽</td>`;
+            let colSpan = isPractice ? 2 : 4;
+            ballHtml += `
+                <td colspan="${colSpan}">
+                    <span style="color:#aaa; font-size:12px;">X:</span> <input type="number" class="coord-input" data-id="ball" data-axis="x" step="0.5" style="margin-right:15px;">
+                    <span style="color:#aaa; font-size:12px;">Y:</span> <input type="number" class="coord-input" data-id="ball" data-axis="y" step="0.5">
+                </td>
+            `;
+            trBall.innerHTML = ballHtml;
+            tbody.appendChild(trBall);
+
+            // 綁定輸入事件
+            document.querySelectorAll('.coord-input').forEach(input => {
+                input.addEventListener('input', (e) => {
+                    if(isPlaying) return; // 播放時禁止修改
+                    const id = e.target.dataset.id;
+                    const axis = e.target.dataset.axis;
+                    const val = parseFloat(e.target.value) || 0;
+                    updateElementFromCoord(id, axis, val);
+                });
+            });
+        }
+
+        // 計算當前場地最大網格數
+        function getGridBounds() {
+            const maxX = 12; // 將 X 軸最大格數改為 12
+            if (courtType === 'full' && courtOrientation === 'horizontal') return { maxX, maxY: 6 };
+            if (courtType === 'full' && courtOrientation === 'vertical') return { maxX, maxY: 24 };
+            return { maxX, maxY: 12 }; // 半場
+        }
+
+        function updateGridInfoText() {
+            const { maxX, maxY } = getGridBounds();
+            document.getElementById('gridInfo').textContent = `X 軸: 0 ~ ${maxX} | Y 軸: 0 ~ ${maxY}`;
+        }
+
+        // 繪製與更新球場上的網格疊加層
+        function updateGridOverlay() {
+            const gridOverlay = document.getElementById('gridOverlay');
+            if (!gridOverlay) return;
+            const { maxX, maxY } = getGridBounds();
+            gridOverlay.setAttribute('viewBox', `0 0 ${maxX} ${maxY}`);
+
+            let gridHTML = '';
+            // 由於 viewBox 縮小到了 12，相應地調整線條粗細與文字大小以適應新比例
+            const lineStyle = 'stroke="rgba(255,255,255,0.4)" stroke-width="0.05" stroke-dasharray="0.1 0.1"';
+            const textStyle = 'fill="rgba(255,255,255,0.8)" font-size="0.4" font-family="monospace"';
+
+            // 畫垂直線 (X軸)，每一格都畫並顯示數字
+            for (let x = 1; x < maxX; x++) {
+                gridHTML += `<line x1="${x}" y1="0" x2="${x}" y2="${maxY}" ${lineStyle} />`;
+                gridHTML += `<text x="${x}" y="0.5" ${textStyle} text-anchor="middle">${x}</text>`;
+                gridHTML += `<text x="${x}" y="${maxY - 0.1}" ${textStyle} text-anchor="middle">${x}</text>`;
+            }
+            // 畫水平線 (Y軸)，每一格都畫並顯示數字
+            for (let y = 1; y < maxY; y++) {
+                gridHTML += `<line x1="0" y1="${y}" x2="${maxX}" y2="${y}" ${lineStyle} />`;
+                gridHTML += `<text x="0.1" y="${y + 0.15}" ${textStyle}>${y}</text>`;
+                gridHTML += `<text x="${maxX - 0.1}" y="${y + 0.15}" ${textStyle} text-anchor="end">${y}</text>`;
+            }
+
+            gridOverlay.innerHTML = gridHTML;
+        }
+
+        // 從畫布位置更新到座標文字框
+        function updateCoordPanelFromBoard() {
+            const { maxX, maxY } = getGridBounds();
+            document.querySelectorAll('.coord-input').forEach(input => {
+                const id = input.dataset.id;
+                const axis = input.dataset.axis;
+                const el = document.getElementById(id);
+                if (el) {
+                    if (axis === 'x') {
+                        const pct = parseFloat(el.style.left) || 0;
+                        input.value = ((pct / 100) * maxX).toFixed(1).replace(/\.0$/, ''); 
+                    } else {
+                        const pct = parseFloat(el.style.top) || 0;
+                        input.value = ((pct / 100) * maxY).toFixed(1).replace(/\.0$/, '');
+                    }
+                }
+            });
+        }
+
+        // 從座標文字框變更套用到畫布元素
+        function updateElementFromCoord(id, axis, value) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const { maxX, maxY } = getGridBounds();
+            
+            if (axis === 'x') {
+                const pct = Math.max(0, Math.min(100, (value / maxX) * 100));
+                el.style.left = pct + '%';
+            } else {
+                const pct = Math.max(0, Math.min(100, (value / maxY) * 100));
+                el.style.top = pct + '%';
+            }
+            
+            // 處理持球
+            if (el.id === ballOwnerId) updateBallToOwnerPosition();
+            if (el.id === 'ball') checkBallCapture(el);
+            
+            saveCurrentStateToStep();
+        }
+
+        // --- 核心球場邏輯 ---
+        function renderCourtBackground() {
+            const isFull = courtType === 'full';
+            const isH = courtOrientation === 'horizontal';
+            const boardWrapper = document.getElementById('boardWrapper');
+
+            // 尺寸控制改為作用在 boardWrapper 上
+            if (isFull && isH) {
+                board.style.aspectRatio = '2 / 1';
+                boardWrapper.style.width = '100%';
+                boardWrapper.style.maxWidth = '1000px';
+                boardWrapper.classList.remove('is-narrow');
+            } else if (isFull && !isH) {
+                board.style.aspectRatio = '1 / 2';
+                boardWrapper.style.width = '50%';
+                boardWrapper.style.maxWidth = '500px';
+                boardWrapper.classList.add('is-narrow');
+            } else {
+                board.style.aspectRatio = '1 / 1'; 
+                boardWrapper.style.width = '50%'; 
+                boardWrapper.style.maxWidth = '500px';
+                boardWrapper.classList.add('is-narrow');
+            }
+
+            let svgContent = '';
+            let goalsContent = '';
+
+            // SVG 新增 <rect> 來繪製場地邊線
+            if (isH) {
+                if (isFull) {
+                    svgContent = `
+                        <svg class="court-bg" viewBox="0 0 400 200" preserveAspectRatio="none">
+                            <rect x="0" y="0" width="400" height="200" fill="transparent" stroke="var(--line-color)" stroke-width="4" />
+                            <path d="M 0 25 A 60 60 0 0 1 60 85 L 60 115 A 60 60 0 0 1 0 175 Z" fill="var(--court-area)" stroke="var(--line-color)" stroke-width="1.5" />
+                            <path d="M 400 25 A 60 60 0 0 0 340 85 L 340 115 A 60 60 0 0 0 400 175 Z" fill="var(--court-area)" stroke="var(--line-color)" stroke-width="1.5" />
+                            <line x1="200" y1="0" x2="200" y2="200" stroke="var(--line-color)" stroke-width="1.5" />
+                            <circle cx="200" cy="100" r="5" fill="var(--line-color)" />
+                            <path d="M 29.6 0 A 90 90 0 0 1 90 85 L 90 115 A 90 90 0 0 1 29.6 200" fill="none" stroke="var(--line-color)" stroke-width="1.5" stroke-dasharray="4, 4" />
+                            <path d="M 370.4 0 A 90 90 0 0 0 310 85 L 310 115 A 90 90 0 0 0 370.4 200" fill="none" stroke="var(--line-color)" stroke-width="1.5" stroke-dasharray="4, 4" />
+                        </svg>`;
+                    goalsContent = `
+                        <div class="goal left" style="width: 1.5%; height: 15%; top: 42.5%; left: -1.5%;"></div>
+                        <div class="goal right" style="width: 1.5%; height: 15%; top: 42.5%; right: -1.5%;"></div>`;
+                } else {
+                    svgContent = `
+                        <svg class="court-bg" viewBox="0 0 200 200" preserveAspectRatio="none">
+                            <rect x="0" y="0" width="200" height="200" fill="transparent" stroke="var(--line-color)" stroke-width="4" />
+                            <path d="M 0 25 A 60 60 0 0 1 60 85 L 60 115 A 60 60 0 0 1 0 175 Z" fill="var(--court-area)" stroke="var(--line-color)" stroke-width="1.5" />
+                            <path d="M 29.6 0 A 90 90 0 0 1 90 85 L 90 115 A 90 90 0 0 1 29.6 200" fill="none" stroke="var(--line-color)" stroke-width="1.5" stroke-dasharray="4, 4" />
+                            <line x1="199" y1="0" x2="199" y2="200" stroke="var(--line-color)" stroke-width="2" stroke-dasharray="8, 8" />
+                        </svg>`;
+                    goalsContent = `<div class="goal left" style="width: 3%; height: 15%; top: 42.5%; left: -3%;"></div>`;
+                }
+            } else {
+                if (isFull) {
+                    svgContent = `
+                        <svg class="court-bg" viewBox="0 0 200 400" preserveAspectRatio="none">
+                            <rect x="0" y="0" width="200" height="400" fill="transparent" stroke="var(--line-color)" stroke-width="4" />
+                            <path d="M 25 0 A 60 60 0 0 0 85 60 L 115 60 A 60 60 0 0 0 175 0 Z" fill="var(--court-area)" stroke="var(--line-color)" stroke-width="1.5" />
+                            <path d="M 25 400 A 60 60 0 0 1 85 340 L 115 340 A 60 60 0 0 1 175 400 Z" fill="var(--court-area)" stroke="var(--line-color)" stroke-width="1.5" />
+                            <line x1="0" y1="200" x2="200" y2="200" stroke="var(--line-color)" stroke-width="1.5" />
+                            <circle cx="100" cy="200" r="5" fill="var(--line-color)" />
+                            <path d="M 0 29.6 A 90 90 0 0 0 85 90 L 115 90 A 90 90 0 0 0 200 29.6" fill="none" stroke="var(--line-color)" stroke-width="1.5" stroke-dasharray="4, 4" />
+                            <path d="M 0 370.4 A 90 90 0 0 1 85 310 L 115 310 A 90 90 0 0 1 200 370.4" fill="none" stroke="var(--line-color)" stroke-width="1.5" stroke-dasharray="4, 4" />
+                        </svg>`;
+                    goalsContent = `
+                        <div class="goal top" style="height: 1.5%; width: 15%; left: 42.5%; top: -1.5%;"></div>
+                        <div class="goal bottom" style="height: 1.5%; width: 15%; left: 42.5%; bottom: -1.5%;"></div>`;
+                } else {
+                    svgContent = `
+                        <svg class="court-bg" viewBox="0 0 200 200" preserveAspectRatio="none">
+                            <rect x="0" y="0" width="200" height="200" fill="transparent" stroke="var(--line-color)" stroke-width="4" />
+                            <path d="M 25 0 A 60 60 0 0 0 85 60 L 115 60 A 60 60 0 0 0 175 0 Z" fill="var(--court-area)" stroke="var(--line-color)" stroke-width="1.5" />
+                            <path d="M 0 29.6 A 90 90 0 0 0 85 90 L 115 90 A 90 90 0 0 0 200 29.6" fill="none" stroke="var(--line-color)" stroke-width="1.5" stroke-dasharray="4, 4" />
+                            <line x1="0" y1="199" x2="200" y2="199" stroke="var(--line-color)" stroke-width="2" stroke-dasharray="8, 8" />
+                        </svg>`;
+                    goalsContent = `<div class="goal top" style="height: 3%; width: 15%; left: 42.5%; top: -3%;"></div>`;
+                }
+            }
+
+            board.querySelectorAll('.court-bg, .goal').forEach(el => el.remove());
+            board.insertAdjacentHTML('afterbegin', svgContent + goalsContent);
+        }
+
+        // 動態獲取佈局並視需要進行 X/Y 翻轉
+        function getDynamicLayout() {
+            const baseLayout = JSON.parse(JSON.stringify(layouts[courtType]));
+            
+            // 若為練習模式，移除紅隊
+            if (gameMode === 'practice') {
+                baseLayout.red = [];
+            }
+
+            if (courtOrientation === 'vertical') {
+                ['blue', 'red', 'ball'].forEach(key => {
+                    let items = Array.isArray(baseLayout[key]) ? baseLayout[key] : [baseLayout[key]];
+                    items.forEach(item => {
+                        if (item) {
+                            let temp = item.left; item.left = item.top; item.top = temp;
+                        }
+                    });
+                });
+            }
+            return baseLayout;
+        }
 
         function initBoard() {
             document.querySelectorAll('.draggable').forEach(el => el.remove());
-            ballOwnerId = null;
+            ballOwnerId = 'b4'; // 設定預設由藍色 4 號持球
             activePointers.clear();
             
-            initialLayout.blue.forEach(p => createDraggable('player blue', p));
-            initialLayout.red.forEach(p => createDraggable('player red', p));
-            createDraggable('ball', { id: 'ball', left: initialLayout.ball.left, top: initialLayout.ball.top, text: '' });
+            // 處理陣型切換面板的顯示 (練習模式不顯示防守陣型)
+            const formationControls = document.getElementById('formationControls');
+            if (courtType === 'half' && gameMode === 'versus') {
+                formationControls.style.display = 'flex';
+                document.querySelectorAll('.btn-formation').forEach(btn => btn.classList.remove('active-mode'));
+                document.querySelector('.btn-formation[data-formation="6-0"]').classList.add('active-mode');
+            } else {
+                formationControls.style.display = 'none';
+            }
+
+            initCoordPanel(); // 根據模式重新渲染座標矩陣
+            renderCourtBackground();
+            updateGridInfoText();
+            updateGridOverlay();
             
-            // 初始化時間線
+            const currentLayout = getDynamicLayout();
+            currentLayout.blue.forEach(p => createDraggable('player blue', p));
+            currentLayout.red.forEach(p => createDraggable('player red', p));
+            createDraggable('ball', { id: 'ball', left: currentLayout.ball.left, top: currentLayout.ball.top, text: '' });
+            
+            // 確保球立刻吸附到預設持球者 (藍色 4 號) 身上
+            updateBallToOwnerPosition();
+
             steps = [];
             addStep(); 
             renderTimeline();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (inputMode === 'coordinate') updateCoordPanelFromBoard();
+
+            setTimeout(resizeCanvas, 350); 
         }
 
         function createDraggable(className, data) {
@@ -307,8 +764,27 @@
             if (owner && ball) {
                 const ownerLeft = parseFloat(owner.style.left);
                 const ownerTop = parseFloat(owner.style.top);
-                ball.style.left = (ownerLeft + BALL_OFFSET_X) + '%';
-                ball.style.top = (ownerTop + BALL_OFFSET_Y) + '%';
+                
+                const boardRect = board.getBoundingClientRect();
+                const ownerRect = owner.getBoundingClientRect();
+                
+                let pctOffsetX = 1.2;
+                let pctOffsetY = -1.2;
+                
+                if (boardRect.width > 0 && boardRect.height > 0) {
+                    // 取得球員半徑
+                    const rPlayer = ownerRect.width / 2;
+                    // 將球的中心點放在球員的右上角邊緣 (45度角，cos/sin = 0.707)
+                    // 這樣會讓手球的左下角恰好與球員重疊約 1/4 面積
+                    const pxOffsetX = rPlayer * 0.707;
+                    const pxOffsetY = -rPlayer * 0.707;
+                    
+                    pctOffsetX = (pxOffsetX / boardRect.width) * 100;
+                    pctOffsetY = (pxOffsetY / boardRect.height) * 100;
+                }
+                
+                ball.style.left = (ownerLeft + pctOffsetX) + '%';
+                ball.style.top = (ownerTop + pctOffsetY) + '%';
             }
         }
 
@@ -331,7 +807,6 @@
                 const pRadius = pRect.width / 2;
 
                 const distance = Math.hypot(ballCenterX - pCenterX, ballCenterY - pCenterY);
-                
                 if (distance < (ballRadius + pRadius + 5)) {
                     ballOwnerId = p.id;
                     foundOwner = true;
@@ -343,7 +818,6 @@
             }
         }
 
-        // 保存當前畫面到當前時段
         function saveCurrentStateToStep() {
             const elements = {};
             document.querySelectorAll('.draggable').forEach(el => {
@@ -352,7 +826,6 @@
             steps[currentStepIndex] = { ballOwnerId, elements };
         }
 
-        // 加載特定時段到畫面
         function loadStepToBoard(index) {
             const step = steps[index];
             if (!step) return;
@@ -368,36 +841,25 @@
                 }
             });
             renderTimeline();
+            if (inputMode === 'coordinate') updateCoordPanelFromBoard();
         }
 
         function addStep() {
-            if (steps.length > 0) {
-                saveCurrentStateToStep();
-            }
+            if (steps.length > 0) saveCurrentStateToStep();
             
-            // 預設繼承上一個時段的位置
             const lastStep = steps[steps.length - 1];
             const newElements = lastStep ? JSON.parse(JSON.stringify(lastStep.elements)) : {};
             
             if (!lastStep) {
-                // 初次初始化
                 document.querySelectorAll('.draggable').forEach(el => {
                     newElements[el.id] = { left: el.style.left, top: el.style.top };
                 });
             }
 
-            steps.push({
-                ballOwnerId: lastStep ? lastStep.ballOwnerId : null,
-                elements: newElements
-            });
-            
+            steps.push({ ballOwnerId: lastStep ? lastStep.ballOwnerId : null, elements: newElements });
             currentStepIndex = steps.length - 1;
             renderTimeline();
-            
-            // 自動滾動到底部
-            setTimeout(() => {
-                timelineScroll.scrollLeft = timelineScroll.scrollWidth;
-            }, 100);
+            setTimeout(() => { timelineScroll.scrollLeft = timelineScroll.scrollWidth; }, 100);
         }
 
         function renderTimeline() {
@@ -417,7 +879,7 @@
 
         // --- 拖拽邏輯 ---
         function onPointerDown(e) {
-            if (isDrawMode || isPlaying) return;
+            if (inputMode === 'coordinate' || isDrawMode || isPlaying) return; 
             const target = e.target.closest('.draggable');
             if (target) {
                 for (let ptr of activePointers.values()) {
@@ -433,7 +895,7 @@
         }
 
         function onPointerMove(e) {
-            if (isDrawMode || isPlaying) return;
+            if (inputMode === 'coordinate' || isDrawMode || isPlaying) return;
             const pointerData = activePointers.get(e.pointerId);
             if (pointerData) {
                 const { target, offsetX, offsetY } = pointerData;
@@ -447,7 +909,6 @@
                 if (target.id === ballOwnerId) updateBallToOwnerPosition();
                 if (target.id === 'ball') checkBallCapture(target);
                 
-                // 動時即存，確保點擊時段時資料是最新的
                 saveCurrentStateToStep();
             }
         }
@@ -476,7 +937,7 @@
             document.getElementById('btnPlay').style.display = 'none';
             document.getElementById('btnStop').style.display = 'flex';
             
-            const durationPerStep = 1000; // 每個時段移動耗時 1 秒
+            const durationPerStep = 1000; 
             const fps = 60;
             const totalFrames = (durationPerStep / 1000) * fps;
 
@@ -489,10 +950,8 @@
 
                 for (let frame = 1; frame <= totalFrames; frame++) {
                     if (!isPlaying) break;
+                    const progress = frame / totalFrames; 
                     
-                    const progress = frame / totalFrames; // 0 to 1
-                    
-                    // 插值計算所有物件位置
                     Object.keys(endStep.elements).forEach(id => {
                         const startPos = startStep.elements[id];
                         const endPos = endStep.elements[id];
@@ -505,16 +964,16 @@
                         el.style.top = curTop + '%';
                     });
 
-                    // 更新目前的球主，但不再強制瞬間吸附，讓球能夠平滑飛過去
                     ballOwnerId = progress > 0.5 ? endStep.ballOwnerId : startStep.ballOwnerId;
                     
+                    if (inputMode === 'coordinate' && frame % 3 === 0) updateCoordPanelFromBoard();
+
                     await new Promise(r => requestAnimationFrame(r));
                 }
                 if (!isPlaying) break;
                 loadStepToBoard(i + 1);
-                await new Promise(r => setTimeout(r, 200)); // 停頓一下
+                await new Promise(r => setTimeout(r, 200)); 
             }
-            
             stopPlayback();
         }
 
@@ -522,18 +981,57 @@
             isPlaying = false;
             document.getElementById('btnPlay').style.display = 'flex';
             document.getElementById('btnStop').style.display = 'none';
+            if (inputMode === 'coordinate') updateCoordPanelFromBoard();
         }
 
-        // --- 畫筆與其他 ---
+        // --- 防守陣型切換邏輯 (修正座標轉換問題) ---
+        function applyFormation(type) {
+            const data = redFormationsVertical[type];
+            if (!data) return;
+
+            Object.keys(data).forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    let pctX = (data[id].x / 12) * 100;
+                    let pctY = (data[id].y / 12) * 100;
+
+                    // 修正：如果目前已經是垂直模式，就不需要翻轉 X/Y
+                    if (courtOrientation === 'vertical') {
+                        el.style.left = pctX + '%';
+                        el.style.top = pctY + '%';
+                    } else {
+                        // 水平模式才需要翻轉
+                        el.style.left = pctY + '%';
+                        el.style.top = pctX + '%';
+                    }
+                    
+                    if (el.id === ballOwnerId) updateBallToOwnerPosition();
+                }
+            });
+            
+            checkBallCapture(document.getElementById('ball'));
+
+            document.querySelectorAll('.btn-formation').forEach(btn => btn.classList.remove('active-mode'));
+            document.querySelector(`.btn-formation[data-formation="${type}"]`).classList.add('active-mode');
+
+            saveCurrentStateToStep();
+            if (inputMode === 'coordinate') updateCoordPanelFromBoard();
+        }
+
+        document.querySelectorAll('.btn-formation').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                if(isPlaying) return;
+                applyFormation(e.target.dataset.formation);
+            });
+        });
+
+        // --- 畫筆與切換 ---
         function resizeCanvas() {
-            // 儲存原本的畫線，避免手機轉向/切換全螢幕時線條消失
             const tempCanvas = document.createElement('canvas');
             const tempCtx = tempCanvas.getContext('2d');
             tempCanvas.width = canvas.width || 1;
             tempCanvas.height = canvas.height || 1;
-            if (canvas.width > 0 && canvas.height > 0) {
-                tempCtx.drawImage(canvas, 0, 0);
-            }
+            if (canvas.width > 0 && canvas.height > 0) tempCtx.drawImage(canvas, 0, 0);
 
             const rect = board.getBoundingClientRect();
             canvas.width = rect.width;
@@ -541,7 +1039,6 @@
             ctx.strokeStyle = '#2c3e50'; 
             ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 
-            // 將舊線條依比例畫回新尺寸的畫布
             if (tempCanvas.width > 1 && tempCanvas.height > 1) {
                 ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width, tempCanvas.height, 0, 0, canvas.width, canvas.height);
             }
@@ -549,7 +1046,7 @@
         window.addEventListener('resize', resizeCanvas);
 
         function startDrawing(e) {
-            if (!isDrawMode) return;
+            if (!isDrawMode || inputMode === 'coordinate') return;
             isDrawing = true;
             const rect = canvas.getBoundingClientRect();
             ctx.beginPath();
@@ -557,78 +1054,103 @@
         }
 
         function draw(e) {
-            if (!isDrawMode || !isDrawing) return;
+            if (!isDrawMode || !isDrawing || inputMode === 'coordinate') return;
             const rect = canvas.getBoundingClientRect();
             ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
             ctx.stroke();
         }
 
-        // 改用 pointer 事件來讓觸控設備也能順暢畫線
-        canvas.addEventListener('pointerdown', (e) => { 
-            if(isDrawMode) { 
-                canvas.setPointerCapture(e.pointerId);
-                startDrawing(e); 
-            }
-        });
-        canvas.addEventListener('pointermove', (e) => { 
-            if(isDrawMode) draw(e); 
-        });
-        canvas.addEventListener('pointerup', (e) => {
-            if(isDrawMode) {
-                canvas.releasePointerCapture(e.pointerId);
-                isDrawing = false;
-            }
-        });
+        canvas.addEventListener('pointerdown', (e) => { if(isDrawMode) { canvas.setPointerCapture(e.pointerId); startDrawing(e); }});
+        canvas.addEventListener('pointermove', (e) => { if(isDrawMode) draw(e); });
+        canvas.addEventListener('pointerup', (e) => { if(isDrawMode) { canvas.releasePointerCapture(e.pointerId); isDrawing = false; }});
         canvas.addEventListener('pointercancel', () => isDrawing = false);
 
-        document.getElementById('btnMove').onclick = () => { 
-            isDrawMode = false; 
-            document.getElementById('btnMove').className = 'active-mode'; 
-            document.getElementById('btnDraw').className = ''; 
-            canvas.style.pointerEvents = 'none'; 
-        };
-        document.getElementById('btnDraw').onclick = () => { 
-            isDrawMode = true; 
-            document.getElementById('btnDraw').className = 'active-mode'; 
-            document.getElementById('btnMove').className = ''; 
-            canvas.style.pointerEvents = 'auto'; 
-        };
+        // 控制面板模式切換
+        document.getElementById('selInputMode').addEventListener('change', (e) => {
+            inputMode = e.target.value;
+            const coordCol = document.getElementById('coordColumn');
+            const btnMove = document.getElementById('btnMove');
+            const btnDraw = document.getElementById('btnDraw');
+            const btnClearDraw = document.getElementById('btnClearDraw');
+            const gridOverlay = document.getElementById('gridOverlay');
+
+            if (inputMode === 'coordinate') {
+                coordCol.style.display = 'block';
+                updateCoordPanelFromBoard();
+                updateGridOverlay();
+                gridOverlay.style.display = 'block';
+                btnMove.disabled = true; btnDraw.disabled = true; btnClearDraw.disabled = true;
+                isDrawMode = false;
+                btnDraw.className = ''; btnMove.className = 'active-mode';
+                canvas.style.pointerEvents = 'none';
+            } else {
+                coordCol.style.display = 'none';
+                gridOverlay.style.display = 'none';
+                btnMove.disabled = false; btnDraw.disabled = false; btnClearDraw.disabled = false;
+                btnMove.click(); // 自動還原成拖曳模式
+            }
+            setTimeout(resizeCanvas, 350); 
+        });
+
+        document.getElementById('btnMove').onclick = () => { isDrawMode = false; document.getElementById('btnMove').className = 'active-mode'; document.getElementById('btnDraw').className = ''; canvas.style.pointerEvents = 'none'; };
+        document.getElementById('btnDraw').onclick = () => { isDrawMode = true; document.getElementById('btnDraw').className = 'active-mode'; document.getElementById('btnMove').className = ''; canvas.style.pointerEvents = 'auto'; };
         document.getElementById('btnClearDraw').onclick = () => ctx.clearRect(0, 0, canvas.width, canvas.height);
-        document.getElementById('btnReset').onclick = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            initBoard();
-        };
+        document.getElementById('btnReset').onclick = () => { initBoard(); };
         document.getElementById('btnAddStep').onclick = () => { if(!isPlaying) addStep(); };
         document.getElementById('btnPlay').onclick = playTactics;
         document.getElementById('btnStop').onclick = stopPlayback;
 
-        // 全螢幕切換功能
         document.getElementById('btnFullscreen').onclick = () => {
             if (!document.fullscreenElement) {
                 const elem = document.documentElement;
                 if (elem.requestFullscreen) elem.requestFullscreen();
-                else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen(); // Safari支援
-                else if (elem.msRequestFullscreen) elem.msRequestFullscreen(); // IE11支援
+                else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
                 
-                // 嘗試鎖定橫向螢幕 (需行動裝置瀏覽器支援)
                 if (screen.orientation && screen.orientation.lock) {
-                    screen.orientation.lock('landscape').catch(e => console.log(e));
+                    let idealOrientation = courtOrientation === 'horizontal' ? 'landscape' : 'portrait';
+                    screen.orientation.lock(idealOrientation).catch(e => console.log(e));
                 }
             } else {
                 if (document.exitFullscreen) document.exitFullscreen();
                 else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-                else if (document.msExitFullscreen) document.msExitFullscreen();
             }
         };
 
-        // --- 匯出與匯入功能 ---
+        // --- 場地設定變更與防呆 Modal ---
+        function triggerFieldChangeModal(gameModeVal, orientationVal, typeVal, sourceSelect) {
+            if (steps.length <= 1) { 
+                gameMode = gameModeVal; courtOrientation = orientationVal; courtType = typeVal;
+                initBoard(); return;
+            }
+            pendingGameMode = gameModeVal; pendingOrientation = orientationVal; pendingType = typeVal;
+            document.getElementById('modalOverlay').style.display = 'flex';
+            if (sourceSelect === 'gameMode') document.getElementById('selGameMode').value = gameMode;
+            if (sourceSelect === 'orientation') document.getElementById('selOrientation').value = courtOrientation;
+            if (sourceSelect === 'type') document.getElementById('selType').value = courtType;
+        }
+
+        document.getElementById('selGameMode').addEventListener('change', (e) => { triggerFieldChangeModal(e.target.value, document.getElementById('selOrientation').value, document.getElementById('selType').value, 'gameMode'); });
+        document.getElementById('selOrientation').addEventListener('change', (e) => { triggerFieldChangeModal(document.getElementById('selGameMode').value, e.target.value, document.getElementById('selType').value, 'orientation'); });
+        document.getElementById('selType').addEventListener('change', (e) => { triggerFieldChangeModal(document.getElementById('selGameMode').value, document.getElementById('selOrientation').value, e.target.value, 'type'); });
+
+        document.getElementById('btnConfirmChange').onclick = () => {
+            gameMode = pendingGameMode; courtOrientation = pendingOrientation; courtType = pendingType;
+            document.getElementById('selGameMode').value = gameMode;
+            document.getElementById('selOrientation').value = courtOrientation;
+            document.getElementById('selType').value = courtType;
+            document.getElementById('modalOverlay').style.display = 'none';
+            initBoard();
+        };
+        document.getElementById('btnCancelChange').onclick = () => { document.getElementById('modalOverlay').style.display = 'none'; };
+
+        // --- 匯出與匯入 ---
         document.getElementById('btnExport').onclick = () => {
             if (isPlaying) return;
-            saveCurrentStateToStep(); // 確保當前修改已儲存
-            const dataStr = JSON.stringify(steps);
+            saveCurrentStateToStep(); 
+            const exportData = { gameMode: gameMode, orientation: courtOrientation, type: courtType, steps: steps };
+            const dataStr = JSON.stringify(exportData);
             const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
             const exportFileDefaultName = 'handball_tactics.json';
-
             const linkElement = document.createElement('a');
             linkElement.setAttribute('href', dataUri);
             linkElement.setAttribute('download', exportFileDefaultName);
@@ -645,30 +1167,48 @@
         document.getElementById('fileImport').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
-
             const reader = new FileReader();
             reader.onload = function(event) {
                 try {
-                    const importedSteps = JSON.parse(event.target.result);
-                    if (Array.isArray(importedSteps) && importedSteps.length > 0) {
-                        steps = importedSteps;
-                        currentStepIndex = 0;
-                        loadStepToBoard(0); // 載入第一個時段
-                        renderTimeline();
-                        ctx.clearRect(0, 0, canvas.width, canvas.height); // 清除舊的畫線
+                    const importedData = JSON.parse(event.target.result);
+                    let importedSteps = [];
+                    if (Array.isArray(importedData)) {
+                        importedSteps = importedData;
                     } else {
-                        alert("❌ 無效的戰術檔案格式！");
+                        importedSteps = importedData.steps;
+                        if (importedData.orientation && importedData.type) {
+                            gameMode = importedData.gameMode || 'versus';
+                            courtOrientation = importedData.orientation; courtType = importedData.type;
+                            document.getElementById('selGameMode').value = gameMode;
+                            document.getElementById('selOrientation').value = courtOrientation;
+                            document.getElementById('selType').value = courtType;
+                        }
                     }
-                } catch (error) {
-                    alert("❌ 讀取檔案失敗！");
-                }
+                    if (Array.isArray(importedSteps) && importedSteps.length > 0) {
+                        initCoordPanel();
+                        renderCourtBackground(); 
+                        updateGridInfoText(); 
+                        updateGridOverlay();
+                        
+                        if (courtType === 'half' && gameMode === 'versus') {
+                            document.getElementById('formationControls').style.display = 'flex';
+                        } else {
+                            document.getElementById('formationControls').style.display = 'none';
+                        }
+                        
+                        steps = importedSteps; currentStepIndex = 0;
+                        loadStepToBoard(0); renderTimeline();
+                        ctx.clearRect(0, 0, canvas.width, canvas.height); 
+                        setTimeout(resizeCanvas, 350); 
+                    } else { alert("❌ 無效的戰術檔案格式！"); }
+                } catch (error) { alert("❌ 讀取檔案失敗！"); }
             };
-            reader.readAsText(file);
-            e.target.value = ''; // 清除選擇，允許未來重複上傳同一檔案
-        });
+        reader.readAsText(file);
+        e.target.value = ''; 
+    });
 
-        initBoard();
-        setTimeout(resizeCanvas, 100);
-    </script>
+    // 啟動程式
+    initBoard();
+</script>
 </body>
 </html>
